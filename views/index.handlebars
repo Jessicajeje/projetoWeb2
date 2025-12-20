@@ -1,14 +1,162 @@
 <main>
-    <form action="/api/registrar" method="POST">
-        <label for="nome">Nome:</label>
-        <input type="text" id="nome" name="nome" required><br>
+  <!-- Removido o action do form para não conflitar com o fetch -->
+  <form id="formPersonagem">
+    <!-- AJUSTE 1: Adicionado o id="tituloForm" -->
+    <h2 id="tituloForm">Criar Personagem</h2>
 
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required><br>
+    <!-- Nome -->
+    <input type="text" name="nome" placeholder="Nome do personagem" required />
 
-        <label for="senha">Senha:</label>
-        <input type="password" id="senha" name="senha" required><br>
+    <!-- Classe -->
+    <select name="classe" required>
+      <option value="">Selecione a classe</option>
+      <option value="Berserker">Berserker</option>
+      <option value="Mago">Mago</option>
+      <option value="Arqueiro">Arqueiro</option>
+      <option value="Paladino">Paladino</option>
+      <option value="Assassino">Assassino</option>
+    </select>
 
-        <button type="submit">Cadastrar</button>
+    <!-- Sexo -->
+    <select name="sexo" id="sexo">
+      <option value="Feminino">Feminino</option>
+      <option value="Masculino">Masculino</option>
+      <option value="Outro">Outro</option>
+    </select>
+
+    <!-- AJUSTE 2: Adicionado o id="btnSubmit" -->
+    <button type="submit" id="btnSubmit">Criar Personagem</button>
+  </form>
+
+
+    <form id="formArma">
+        <h2>Criar Arma</h2>
+        <input type="text" name="nome" placeholder="Nome da arma" required />
+        <select name="tipo" required>
+            <option value="">Selecione o tipo</option>
+            <option value="Corpo a Corpo">Corpo a Corpo</option>
+            <option value="Longo Alcance">Longo Alcance</option>
+            <option value="Mágica">Mágica</option>
+            <option value="Defensiva">Defensiva</option>
+        </select>
+        <input type="text" name="habilidade_nome" placeholder="Habilidade" required>
+        <button type="submit">Criar Arma</button>
     </form>
-</main>
+
+    <!-- Esta div DEVE estar com display:none e fora do <form> -->
+    <div id="displayDados" style="display:none; margin-top: 20px; border: 1px solid #444; padding: 15px;">
+        <h3>Resumo do Cadastro</h3>
+        <div style="display: flex; gap: 20px;">
+            <div id="infoPersonagem">
+                <h4>👤 Personagem</h4>
+                <div id="detalhesPersonagem"></div>
+                <button id="btnEditarPersonagem">Editar Personagem</button>
+            </div>
+            <div id="infoArma">
+                <h4>⚔️ Arma</h4>
+                <div id="detalhesArma"></div>
+                <button id="btnEditarArma">Editar Arma</button>
+            </div>
+        </div>
+    </div>
+    </main>
+
+<script>
+// Usamos o localStorage para que o ID não se perca se a página recarregar
+localStorage.removeItem("personagem_id"); 
+let personagemId = null; 
+
+const formP = document.getElementById("formPersonagem");
+const formA = document.getElementById("formArma");
+const resumo = document.getElementById("displayDados");
+
+// Força o estado inicial visual
+formP.style.display = "block"; 
+formA.style.display = "none";  
+resumo.style.display = "none";
+
+// --- 1. LÓGICA DO PERSONAGEM (Cria ou Edita) ---
+formP.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const dados = Object.fromEntries(new FormData(e.target));
+    
+    // Se já temos um ID, fazemos PUT (edição), senão POST (criação)
+    const url = personagemId ? `/api/personagem/${personagemId}` : "/api/personagem";
+    const metodo = personagemId ? "PUT" : "POST";
+
+    const res = await fetch(url, {
+        method: metodo,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dados)
+    });
+
+    const personagem = await res.json();
+    
+    // Ajuste aqui conforme o nome que seu backend retorna (id ou id_personagem)
+    personagemId = personagem.id_personagem || personagem.id || personagemId;
+    localStorage.setItem("id_personagem", personagemId);
+    
+    // Guarda nomes para o resumo final
+    localStorage.setItem("temp_nome", dados.nome);
+    localStorage.setItem("temp_classe", dados.classe);
+
+    alert(metodo === "PUT" ? "Personagem atualizado!" : "Personagem criado!");
+
+    formP.style.display = "none";
+    formA.style.display = "block";
+});
+
+// --- 2. LÓGICA DA ARMA ---
+formA.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    if (!personagemId) {
+        alert("Erro: ID do personagem não encontrado.");
+        return;
+    }
+
+    const dados = Object.fromEntries(new FormData(e.target));
+    
+    // IMPORTANTE: O nome do campo aqui deve ser IGUAL ao que o Sequelize espera
+    dados.id_personagem = parseInt(personagemId); 
+
+    const res = await fetch("/api/armas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dados)
+    });
+
+    if (res.ok) {
+        const arma = await res.json();
+        
+        // --- 3. EXIBIR RESUMO FINAL ---
+        formA.style.display = "none";
+        resumo.style.display = "block";
+
+        document.getElementById("detalhesPersonagem").innerHTML = `
+            <p><strong>Nome:</strong> ${localStorage.getItem("temp_nome")}</p>
+            <p><strong>Classe:</strong> ${localStorage.getItem("temp_classe")}</p>
+            <p><strong>Sexo:</strong> ${document.getElementById("sexo").value}</p>
+
+        `;
+
+        document.getElementById("detalhesArma").innerHTML = `
+            <p><strong>Arma:</strong> ${arma.nome}</p>
+            <p><strong>Tipo:</strong> ${arma.tipo}</p>
+            <p><strong>Habilidade:</strong> ${arma.habilidade_nome}</p>
+        `;
+    }
+});
+
+// --- 4. BOTÕES DE EDIÇÃO NO RESUMO ---
+document.getElementById("btnEditarPersonagem").onclick = () => {
+    resumo.style.display = "none";
+    formP.style.display = "block";
+    document.getElementById("tituloForm").innerText = "Editando Personagem";
+};
+
+document.getElementById("btnEditarArma").onclick = () => {
+    resumo.style.display = "none";
+    formA.style.display = "block";
+};
+</script>

@@ -6,20 +6,21 @@ const express = require("express");
 const exphbs = require("express-handlebars");
 const path = require("path");
 const sequelize = require("./config/banco");
-require("./models/Usuario");
-// 3️⃣ APP
+
+// 3️⃣ CONFIGURAÇÃO DO APP
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 /* ======================
-   4️⃣ MIDDLEWARES
+   4️⃣ MIDDLEWARES (Essencial vir antes das rotas)
 ====================== */
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 /* ======================
-   5️⃣ TEMPLATE ENGINE
+   5️⃣ TEMPLATE ENGINE (Handlebars)
 ====================== */
 app.engine(
   "handlebars",
@@ -35,29 +36,39 @@ app.set("views", path.join(__dirname, "views"));
 /* ======================
    6️⃣ ROTAS
 ====================== */
+// Importação das rotas
 const apiRoutes = require("./routes/api");
-app.use("/api", apiRoutes);
+const armaRoutes = require("./routes/armaROUTES");
+const personagemRoutes = require("./routes/personagemROUTES");
 
-// rotas de páginas
+// Uso das rotas com prefixo /api
+app.use("/api", apiRoutes);
+app.use("/api", armaRoutes);
+app.use("/api", personagemRoutes);
+
+// Rotas de páginas (Frontend)
 app.get("/", (req, res) => {
   res.render("index");
 });
 
-app.get("/form2", (req, res) => {
-  res.render("form2");
+app.get("/arma", (req, res) => {
+  res.render("arma");
 });
 
 /* ======================
-   7️⃣ BANCO DE DADOS
+   7️⃣ CONEXÃO COM BANCO E INICIALIZAÇÃO
 ====================== */
+// Sincroniza o banco primeiro, depois sobe o servidor
 sequelize
-  .sync({ force: true })
-  .then(() => console.log("✅ Banco sincronizado"))
-  .catch((err) => console.error("❌ Erro no banco:", err));
-
-/* ======================
-   8️⃣ SERVIDOR
-====================== */
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
-});
+  .sync({ alter: true }) //ajusta a tabela sem apagar os dados
+  .then(() => {
+    console.log("✅ Banco de dados sincronizado com sucesso!");
+    
+    app.listen(PORT, () => {
+      console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("❌ Falha ao sincronizar o banco de dados:", err);
+    process.exit(1); // Fecha o app se o banco falhar
+  });
